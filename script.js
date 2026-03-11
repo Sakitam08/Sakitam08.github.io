@@ -5,6 +5,18 @@ const navMenu = document.querySelector('.nav-menu');
 hamburger.addEventListener('click', () => {
     navMenu.classList.toggle('active');
     hamburger.classList.toggle('active');
+    
+    // 更新无障碍属性
+    const isExpanded = hamburger.classList.contains('active');
+    hamburger.setAttribute('aria-expanded', isExpanded.toString());
+});
+
+// 为汉堡菜单添加键盘支持
+hamburger.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        hamburger.click();
+    }
 });
 
 // 点击导航链接后关闭菜单
@@ -21,13 +33,23 @@ function copyText(text) {
         showToast('复制成功！');
     }).catch(err => {
         // 如果clipboard API失败，使用传统方法
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showToast('复制成功！');
+        try {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            const success = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            if (success) {
+                showToast('复制成功！');
+            } else {
+                showToast('复制失败，请手动复制');
+            }
+        } catch (error) {
+            showToast('复制失败，请手动复制');
+            console.error('复制失败:', error);
+        }
     });
 }
 
@@ -39,8 +61,11 @@ function showToast(message) {
     document.body.appendChild(toast);
     
     setTimeout(() => {
-        toast.remove();
-    }, 3000);
+        toast.style.animation = 'slideOut 0.3s ease forwards';
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, 2700);
 }
 
 // 表单提交处理
@@ -48,6 +73,38 @@ function handleSubmit(event) {
     event.preventDefault();
     
     const form = event.target;
+    const submitButton = form.querySelector('.btn-submit');
+    const phone = form.phone.value;
+    const message = form.message.value;
+    
+    // 自定义验证
+    const email = form.email.value;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showToast('请输入正确的邮箱格式');
+        return;
+    }
+    
+    if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
+        showToast('请输入正确的手机号码格式');
+        return;
+    }
+    
+    if (message.length < 10) {
+        showToast('留言内容至少需要10个字符');
+        return;
+    }
+    
+    if (message.length > 500) {
+        showToast('留言内容不能超过500个字符');
+        return;
+    }
+    
+    // 添加加载状态
+    submitButton.classList.add('loading');
+    const originalText = submitButton.textContent;
+    submitButton.textContent = '提交中';
+    submitButton.disabled = true;
+    
     const formData = new FormData(form);
     const data = {};
     
@@ -60,11 +117,19 @@ function handleSubmit(event) {
     
     console.log('表单数据:', data);
     
-    // 显示成功提示
-    showToast('留言提交成功！我会尽快联系您。');
-    
-    // 重置表单
-    form.reset();
+    // 模拟提交延迟
+    setTimeout(() => {
+        // 显示成功提示
+        showToast('留言提交成功！我会尽快联系您。');
+        
+        // 重置表单
+        form.reset();
+        
+        // 移除加载状态
+        submitButton.classList.remove('loading');
+        submitButton.textContent = originalText;
+        submitButton.disabled = false;
+    }, 1000);
 }
 
 // 导航栏滚动效果
@@ -100,7 +165,11 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         const target = document.querySelector(this.getAttribute('href'));
         
         if (target) {
-            const offsetTop = target.offsetTop - 70;
+            const navbar = document.querySelector('.navbar');
+            const navbarHeight = navbar ? navbar.offsetHeight : 70;
+            
+            // 滚动到目标元素位置减去导航栏高度，确保内容紧贴导航栏下方
+            const offsetTop = target.offsetTop - navbarHeight;
             window.scrollTo({
                 top: offsetTop,
                 behavior: 'smooth'
@@ -120,6 +189,8 @@ const observer = new IntersectionObserver((entries) => {
         if (entry.isIntersecting) {
             entry.target.style.opacity = '1';
             entry.target.style.transform = 'translateY(0)';
+            // 元素显示后停止观察，提高性能
+            observer.unobserve(entry.target);
         }
     });
 }, observerOptions);
@@ -132,9 +203,80 @@ document.querySelectorAll('.service-card, .portfolio-item').forEach(item => {
     observer.observe(item);
 });
 
+// 为图片添加错误处理
+function handleImageError(img) {
+    img.onerror = null;
+    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"%3E%3Crect width="300" height="200" fill="%23f0f0f0"/%3E%3Ctext x="50%" y="50%" font-size="16" text-anchor="middle" fill="%23999" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E';
+    img.alt = '图片加载失败';
+}
+
+// 为所有图片添加错误处理
+document.querySelectorAll('img').forEach(img => {
+    img.onerror = function() {
+        handleImageError(this);
+    };
+});
+
+// 回到顶部按钮功能
+const backToTopButton = document.getElementById('backToTop');
+
+window.addEventListener('scroll', () => {
+    if (window.pageYOffset > 300) {
+        backToTopButton.classList.add('active');
+    } else {
+        backToTopButton.classList.remove('active');
+    }
+});
+
+backToTopButton.addEventListener('click', () => {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+});
+
+// 图片预览功能
+const modal = document.getElementById('imagePreviewModal');
+const previewImage = document.getElementById('previewImage');
+const closeModal = document.querySelector('.close-modal');
+
+// 为所有案例图片添加点击事件
+document.querySelectorAll('.portfolio-image img').forEach(img => {
+    img.addEventListener('click', () => {
+        modal.classList.add('show');
+        previewImage.src = img.src;
+        previewImage.alt = img.alt;
+        document.body.style.overflow = 'hidden'; // 防止背景滚动
+    });
+});
+
+// 关闭模态框
+function closeModalFunc() {
+    modal.classList.remove('show');
+    document.body.style.overflow = ''; // 恢复背景滚动
+}
+
+closeModal.addEventListener('click', closeModalFunc);
+
+// 点击模态框背景关闭
+modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+        closeModalFunc();
+    }
+});
+
+// 键盘Escape键关闭
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('show')) {
+        closeModalFunc();
+    }
+});
+
 // 添加当前年份到页脚
 const currentYear = new Date().getFullYear();
 const footerYear = document.querySelector('.footer-bottom p');
 if (footerYear) {
     footerYear.innerHTML = footerYear.innerHTML.replace('2024', currentYear);
+} else {
+    console.log('Footer year element not found');
 }
